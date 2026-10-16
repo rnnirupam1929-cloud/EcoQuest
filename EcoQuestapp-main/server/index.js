@@ -15,7 +15,7 @@ app.use(express.json());
 // RSS Feed Aggregator
 const parser = new RSSParser();
 const cache = new NodeCache({ stdTTL: 3600 }); // Refresh environmental news hourly
-const MAX_ECO_NEWS_ITEMS = 5;
+const MAX_ECO_NEWS_ITEMS = 4;
 
 function loadFeeds() {
   try {

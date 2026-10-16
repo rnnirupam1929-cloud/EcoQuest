@@ -40,7 +40,13 @@ type ChatMsg = { role: "user" | "bot"; text: string };
 
 // ─── Eco News (live RSS feed with a per-user Firestore cache) ──────────────────
 type NewsItem = { title: string; link: string; pubDate?: string; source: string };
-const MAX_ECO_NEWS_ITEMS = 5;
+const MAX_ECO_NEWS_ITEMS = 4;
+const GOOGLE_NEWS_FALLBACK: NewsItem[] = [
+  { title: "Latest climate change headlines", link: "https://news.google.com/search?q=climate%20change&hl=en-IN&gl=IN&ceid=IN%3Aen", source: "Google News" },
+  { title: "Latest environmental news from India", link: "https://news.google.com/search?q=environment%20India&hl=en-IN&gl=IN&ceid=IN%3Aen", source: "Google News" },
+  { title: "Latest renewable energy headlines", link: "https://news.google.com/search?q=renewable%20energy&hl=en-IN&gl=IN&ceid=IN%3Aen", source: "Google News" },
+  { title: "Latest wildlife and biodiversity headlines", link: "https://news.google.com/search?q=wildlife%20biodiversity&hl=en-IN&gl=IN&ceid=IN%3Aen", source: "Google News" },
+];
 
 function parseNewsItems(value: unknown): NewsItem[] {
   if (!Array.isArray(value)) return [];
@@ -61,6 +67,15 @@ function parseNewsItems(value: unknown): NewsItem[] {
   }).slice(0, MAX_ECO_NEWS_ITEMS);
 }
 
+function fillEcoNews(items: NewsItem[]): NewsItem[] {
+  const result = [...items].slice(0, MAX_ECO_NEWS_ITEMS);
+  for (const fallback of GOOGLE_NEWS_FALLBACK) {
+    if (result.length >= MAX_ECO_NEWS_ITEMS) break;
+    if (!result.some(item => item.link === fallback.link)) result.push(fallback);
+  }
+  return result;
+}
+
 function timeAgo(dateStr?: string) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -75,12 +90,12 @@ function timeAgo(dateStr?: string) {
 }
 
 const challenges = [
-  { id: 1, icon: "🌱", title: "Day 1: Plant 5 Plants",     desc: "Add new green companions to your space",  points: 150, difficulty: "Easy",   color: "#dcfce7", accent: "#16a34a" },
+  { id: 1, icon: "🌱", title: "Day 1: Dump 5 plastic",     desc: "Add new green companions to your space",  points: 150, difficulty: "Easy",   color: "#dcfce7", accent: "#16a34a" },
   { id: 2, icon: "💧", title: "Day 2: Clean Water Bodies", desc: "Help restore local water ecosystems",      points: 250, difficulty: "Hard",   color: "#dbeafe", accent: "#2563eb" },
   { id: 3, icon: "🐾", title: "Day 3: Dump wet waste",     desc: "Dispose of wet waste in the correct bin",   points: 120, difficulty: "Easy",   color: "#fce7f3", accent: "#db2777" },
   { id: 4, icon: "♻️", title: "Day 3: Dump wet waste",      desc: "Dispose of wet waste in the correct bin",   points: 180, difficulty: "Medium", color: "#fef9c3", accent: "#d97706" },
   { id: 5, icon: "🚌", title: "Day 5: Public Transport",   desc: "Ditch the car, ride green today",          points: 100, difficulty: "Easy",   color: "#e0f2fe", accent: "#0284c7" },
-  { id: 6, icon: "💡", title: "Day 4: Collect 5 plastic", desc: "Switch off and unplug everything unused",  points: 140, difficulty: "Medium", color: "#f3e8ff", accent: "#9333ea" },
+  { id: 6, icon: "💡", title: "Day 4: Collect paper waste", desc: "Switch off and unplug everything unused",  points: 140, difficulty: "Medium", color: "#f3e8ff", accent: "#9333ea" },
   { id: 7, icon: "👕", title: "Day 7: Donate Clothes",     desc: "Give your old garments a second life",     points: 300, difficulty: "Medium", color: "#fde68a", accent: "#ca8a04" },
 ];
 const visibleChallenges = challenges.filter(task => task.id !== 3 && task.id !== 5 && task.id !== 7);
@@ -131,8 +146,7 @@ function HomeTab({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, chatLoading]);
 
-  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
-  const [newsError, setNewsError] = useState<string | null>(null);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>(GOOGLE_NEWS_FALLBACK);
 
   useEffect(() => {
     let mounted = true;
@@ -146,7 +160,7 @@ function HomeTab({
         const cachedItems = parseNewsItems(saved?.ecoNewsCache);
         if (mounted && cachedItems.length) {
           hasUsableNews = true;
-          setNewsItems(cachedItems);
+          setNewsItems(fillEcoNews(cachedItems));
         }
       } catch (error) {
         console.error("Failed to load Eco News cache from Firebase", error);
@@ -165,8 +179,7 @@ function HomeTab({
         const items = parseNewsItems(data.items);
         if (!items.length) throw new Error("Eco News API returned no articles");
         hasUsableNews = true;
-        setNewsItems(items);
-        setNewsError(null);
+        setNewsItems(fillEcoNews(items));
         if (userId) {
           try {
             await saveEcoNewsCache(userId, items);
@@ -177,7 +190,7 @@ function HomeTab({
       } catch (error) {
         if (!mounted) return;
         console.warn("Failed to load Eco News", error);
-        if (!hasUsableNews) setNewsError("Eco News is temporarily unavailable. Please check your connection.");
+        if (!hasUsableNews) setNewsItems(GOOGLE_NEWS_FALLBACK);
       }
     }
 
@@ -269,17 +282,15 @@ function HomeTab({
           </div>
         </div>
         <div className="px-4 pb-4 flex flex-col">
-          {newsError ? (
-            <div className="px-4 py-5 rounded-2xl" style={{ background: 'rgba(255,255,255,0.08)' }}>
-              <p className="text-slate-200 text-xs">{newsError}</p>
-            </div>
-          ) : (
-            newsItems.slice(0, MAX_ECO_NEWS_ITEMS).map((item, i) => (
+          {newsItems.slice(0, MAX_ECO_NEWS_ITEMS).map((item, i) => (
               <div key={item.link || i}>
-                <motion.div
+                <motion.a
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: Math.min(i * 0.01, 0.25) }}
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-start justify-between gap-3 py-3"
                 >
                   <div className="flex-1">
@@ -290,18 +301,17 @@ function HomeTab({
                       </span>
                       <span className="text-green-600 text-xs opacity-60">{timeAgo(item.pubDate)}</span>
                     </div>
-                    <p className="text-white text-xs leading-relaxed font-medium opacity-90">{item.title}</p>
+                    <p className="text-white text-xs leading-relaxed font-medium opacity-90 truncate whitespace-nowrap">{item.title}</p>
                   </div>
-                  <motion.button whileTap={{ scale: 0.9 }} className="mt-1 flex-shrink-0" onClick={() => item.link && window.open(item.link, '_blank', 'noopener')}>
+                  <span className="mt-1 flex-shrink-0">
                     <ArrowRight size={15} className="text-green-500" />
-                  </motion.button>
-                </motion.div>
+                  </span>
+                </motion.a>
                 {i < Math.min(newsItems.length, MAX_ECO_NEWS_ITEMS) - 1 && (
                   <div className="border-t border-dashed" style={{ borderColor: "rgba(74,222,128,0.12)" }} />
                 )}
               </div>
-            ))
-          )}
+            ))}
         </div>
       </div>
 
@@ -507,7 +517,7 @@ const navItems: {
 ];
 
 const tabLabels: Record<TabId, { subtitle: string; title: string }> = {
-  home:        { subtitle: "",                   title: "Weekly Challenges"     },
+  home:        { subtitle: "",                   title: "Smart Waste Management" },
   explore:     { subtitle: "🗺️ Discover",         title: "Explore Green Spaces"  },
   leaderboard: { subtitle: "🏆 Rankings",         title: "Top Eco Warriors"      },
   rewards:     { subtitle: "🎁 Earn & Unlock",    title: "Rewards"               },
@@ -562,12 +572,14 @@ export function Dashboard({
   setProgress,
   user,
   onChallengeComplete,
+  onUserUpdate,
 }: {
   onBack: () => void;
   progress: Progress;
   setProgress: Dispatch<SetStateAction<Progress>>;
   user: UserType | null;
   onChallengeComplete: (challengeId: number, points: number) => Promise<void>;
+  onUserUpdate: (details: { name?: string; picture?: string }) => void;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [activeTask, setActiveTask] = useState<typeof challenges[0] | null>(null);
@@ -716,7 +728,7 @@ export function Dashboard({
               </RewardsScreenBoundary>
             )}
             {activeTab === "profile"     && (
-              <ProfileScreen user={user} progress={progress} onLogout={onBack} />
+              <ProfileScreen user={user} progress={progress} onLogout={onBack} onUserUpdate={onUserUpdate} />
             )}
           </motion.div>
         </AnimatePresence>

@@ -9,14 +9,14 @@ console.log(`✓ Retrieved ${rewards.length} rewards from catalogue`);
 assert.strictEqual(rewards.length, 8, 'Expected 8 configured rewards');
 
 const expectedMilestones = [
-  { id: 1, name: 'Flower Pot', points: 30 },
-  { id: 2, name: 'Watering Can', points: 60 },
-  { id: 3, name: 'Eco Bag', points: 90 },
-  { id: 4, name: 'Seed Kit', points: 120 },
-  { id: 5, name: 'Indoor Plant', points: 150 },
-  { id: 6, name: 'Compost Bin', points: 180 },
-  { id: 7, name: 'Bird House', points: 210 },
-  { id: 8, name: 'Eco Cookware', points: 240 },
+  { id: 1, name: 'Flower Pot', points: 80 },
+  { id: 2, name: 'Watering Can', points: 120 },
+  { id: 3, name: 'Eco Bag', points: 190 },
+  { id: 4, name: 'Seed Kit', points: 210 },
+  { id: 5, name: 'Indoor Plant', points: 250 },
+  { id: 6, name: 'Compost Bin', points: 320 },
+  { id: 7, name: 'Bird House', points: 870 },
+  { id: 8, name: 'Eco Cookware', points: 1350 },
 ];
 
 expectedMilestones.forEach(exp => {
@@ -27,15 +27,15 @@ expectedMilestones.forEach(exp => {
   console.log(`  ✓ Milestone Verified: ${found.name} -> ${found.points} pts (asset: ${found.image})`);
 });
 
-// 2. Test below threshold (e.g. 15 points trying to claim 30 pt Flower Pot)
+// 2. Test below threshold (e.g. 15 points trying to claim an 80 pt Flower Pot)
 const testUser1 = 'test_warrior_alice_' + Date.now();
 const belowThresholdResult = rewardService.claimReward(testUser1, 1, 15);
-assert.strictEqual(belowThresholdResult.ok, false, 'Claim should fail when points < 30');
+assert.strictEqual(belowThresholdResult.ok, false, 'Claim should fail when points < 80');
 assert(belowThresholdResult.error.includes('Points threshold not met'), 'Error message should indicate threshold not met');
-console.log('✓ Ineligible claim correctly rejected when points below threshold (15 < 30)');
+console.log('✓ Ineligible claim correctly rejected when points below threshold (15 < 80)');
 
-// 3. Test exact threshold (30 points claiming 30 pt Flower Pot)
-const exactResult = rewardService.claimReward(testUser1, 1, 30);
+// 3. Test exact threshold (80 points claiming 80 pt Flower Pot)
+const exactResult = rewardService.claimReward(testUser1, 1, 80);
 assert.strictEqual(exactResult.ok, true, 'Claim should succeed when points meet threshold');
 assert.strictEqual(exactResult.status, 201, 'Status should be 201 Created');
 assert(exactResult.claim, 'Claim object should be returned');
@@ -43,7 +43,7 @@ assert(/^ECO-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(exactResult.claim.redemptionCode), `
 console.log(`✓ Eligible claim succeeded! Generated secure code: ${exactResult.claim.redemptionCode}`);
 
 // 4. Test duplicate claim prevention (Alice trying to claim Flower Pot again)
-const duplicateResult = rewardService.claimReward(testUser1, 1, 30);
+const duplicateResult = rewardService.claimReward(testUser1, 1, 80);
 assert.strictEqual(duplicateResult.ok, true, 'Duplicate claim should return 200 with existing claim');
 assert.strictEqual(duplicateResult.alreadyClaimed, true, 'alreadyClaimed flag should be true');
 assert.strictEqual(duplicateResult.claim.redemptionCode, exactResult.claim.redemptionCode, 'Existing code should be preserved');
@@ -73,15 +73,32 @@ const unauthorizedRedemption = rewardService.redeemReward(testUser2, exactResult
 assert.strictEqual(unauthorizedRedemption.ok, false, 'A user must not redeem another user’s reward');
 assert.strictEqual(unauthorizedRedemption.status, 404, 'Cross-user redemption should not disclose the claim');
 
-// 6. Test exceeding threshold (Bob has 100 points, claims Watering Can at 60 pts)
-const bobCanClaim = rewardService.claimReward(testUser2, 2, 100);
-assert.strictEqual(bobCanClaim.ok, true, 'Claim should succeed when points > threshold');
+// 6. Test exceeding threshold (Bob has 150 points, claims Watering Can at 120 pts)
+const bobCanClaim = rewardService.claimReward(testUser2, 2, 150);
+assert.strictEqual(bobCanClaim.ok, true, 'Claim should succeed when points exceed the threshold');
 assert.notStrictEqual(bobCanClaim.claim.redemptionCode, exactResult.claim.redemptionCode, 'Codes must be unique');
 console.log(`✓ Exceeding threshold verified! Bob claimed Watering Can with code: ${bobCanClaim.claim.redemptionCode}`);
 
 // 7. Verify Amazon India URL
-assert.strictEqual(bobCanClaim.claim.retailerUrl, 'https://www.amazon.in/', 'Retailer URL should point to Amazon India');
+assert.strictEqual(
+  bobCanClaim.claim.retailerUrl,
+  `https://www.amazon.in/s?k=${encodeURIComponent('Watering Can')}`,
+  'Retailer URL should search Amazon India for the claimed reward',
+);
 assert(bobCanClaim.claim.disclaimer.includes('not an Amazon-issued voucher'), 'Disclaimer should clarify not an Amazon voucher');
 console.log('✓ Amazon India integration and non-voucher disclaimer verified');
+
+// 8. Redeeming an 80-point reward from 250 points subtracts only the reward cost
+const testUser3 = 'test_warrior_charlie_' + Date.now();
+rewardService.syncUserProgress(testUser3, { points: 250 });
+const flowerPotClaim = rewardService.claimReward(testUser3, 1, 250);
+assert.strictEqual(flowerPotClaim.ok, true, 'User with 250 points should claim an 80-point reward');
+const accurateRedemption = rewardService.redeemReward(testUser3, flowerPotClaim.claim.claimId);
+assert.strictEqual(accurateRedemption.ok, true, 'Redemption should succeed for a user with enough points');
+assert.strictEqual(accurateRedemption.remainingPoints, 170, 'An 80-point reward should deduct only 80 from 250 points');
+const repeatedAccurateRedemption = rewardService.redeemReward(testUser3, flowerPotClaim.claim.claimId);
+assert.strictEqual(repeatedAccurateRedemption.remainingPoints, 170, 'Repeated redemption must preserve the 170-point balance');
+assert.strictEqual(rewardService.getUser(testUser3).points, 170, 'The stored balance should remain 170 after redemption');
+console.log('✓ Redemption subtracts exactly 80 points from 250 and cannot deduct again');
 
 console.log('\n--- ALL VERIFICATION TESTS PASSED SUCCESSFULLY! ---');

@@ -34,6 +34,24 @@ const defaultProgress: Progress = {
   trees: 0,
 };
 
+function withSavedProfile(user: User): User {
+  try {
+    const saved = localStorage.getItem(`ecoquest:profile:${user.id}`);
+    if (!saved) return user;
+    const profile: unknown = JSON.parse(saved);
+    if (!profile || typeof profile !== "object") return user;
+    const details = profile as { name?: unknown; picture?: unknown };
+    return {
+      ...user,
+      ...(typeof details.name === "string" ? { name: details.name } : {}),
+      ...(typeof details.picture === "string" ? { picture: details.picture } : {}),
+    };
+  } catch (error) {
+    console.warn("Could not load locally saved profile details", error);
+    return user;
+  }
+}
+
 declare global {
   interface Window { google?: any; }
 }
@@ -96,12 +114,12 @@ function MobileAppPreview() {
     const unsubscribe = onAuthStateChanged(async firebaseUser => {
       if (firebaseUser) {
         setProgressLoaded(false);
-        setUser({
+        setUser(withSavedProfile({
           id: firebaseUser.uid,
           name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "EcoWarrior",
           email: firebaseUser.email || "",
           picture: firebaseUser.photoURL || undefined,
-        });
+        }));
 
         await loadUserProgress(firebaseUser);
         setProgressLoaded(true);
@@ -123,12 +141,12 @@ function MobileAppPreview() {
 
   const handleUserLoggedIn = async (firebaseUser: { uid: string; displayName?: string | null; email?: string | null; photoURL?: string | null }) => {
     setProgressLoaded(false);
-    setUser({
+    setUser(withSavedProfile({
       id: firebaseUser.uid,
       name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "EcoWarrior",
       email: firebaseUser.email || "",
       picture: firebaseUser.photoURL || undefined,
-    });
+    }));
     go("dashboard", 1);
     try {
       await loadUserProgress(firebaseUser);
@@ -143,7 +161,7 @@ function MobileAppPreview() {
     const idx = SCREENS.indexOf(screen);
     if (idx < SCREENS.length - 1) {
       if (screen === "login" && !user) {
-        setUser({ id: "guest", name: "EcoWarrior", email: "warrior@ecoquest.app" });
+        setUser(withSavedProfile({ id: "guest", name: "EcoWarrior", email: "warrior@ecoquest.app" }));
       }
       go(SCREENS[idx + 1], 1);
     }
@@ -164,12 +182,12 @@ function MobileAppPreview() {
       setProgressLoaded(false);
       await loadUserProgress(firebaseUser);
       setProgressLoaded(true);
-      setUser({
+      setUser(withSavedProfile({
         id: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "EcoWarrior",
         email: firebaseUser.email || "",
         picture: firebaseUser.photoURL || undefined,
-      });
+      }));
       go("dashboard", 1);
     } catch (error) {
       console.error("App: Google login failed", error);
@@ -334,6 +352,14 @@ function MobileAppPreview() {
                     setProgress={setProgress}
                     user={user}
                     onChallengeComplete={onChallengeComplete}
+                    onUserUpdate={(details) => setUser((current) => {
+                      const profile = current || {
+                        id: "guest",
+                        name: "EcoWarrior",
+                        email: "warrior@ecoquest.app",
+                      };
+                      return { ...profile, ...details };
+                    })}
                   />
                 )}
               </motion.div>

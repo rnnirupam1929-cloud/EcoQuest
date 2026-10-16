@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   User, Edit3, Award, Share2, Settings, HelpCircle, FileText,
-  LogOut, ChevronRight, Flame, Zap, TreePine, CheckCircle2,
+  LogOut, ChevronRight, Flame, Zap, CheckCircle2,
   Phone, Mail, Calendar, MapPin, Copy, ExternalLink, ScanSearch,
   Sun, Moon, Leaf, Bell, Shield, Info, ChevronDown,
-  X, Check, Star, MessageSquare, Globe,
+  X, Check, Star, MessageSquare, Globe, Camera, Loader2,
 } from "lucide-react";
+import { saveProfileDetails, uploadProfilePhoto } from "../../../../firebase-config";
 
 type Progress = {
   points: number;
@@ -23,6 +24,29 @@ type User = {
 };
 
 type SubPage = null | "edit" | "settings" | "faq" | "refer" | "legal";
+
+function saveLocalProfileDetails(uid: string, details: { name?: string; picture?: string }) {
+  const key = `ecoquest:profile:${uid}`;
+  const saved = localStorage.getItem(key);
+  const current = saved ? JSON.parse(saved) as Record<string, unknown> : {};
+  localStorage.setItem(key, JSON.stringify({ ...current, ...details }));
+}
+
+async function profileImageDataUrl(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("This browser cannot process the selected image.");
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } finally {
+    bitmap.close();
+  }
+}
 
 const faqItems = [
   {
@@ -482,14 +506,88 @@ export function ProfileScreen({
   user,
   progress,
   onLogout,
+  onUserUpdate,
 }: {
   user: User | null;
   progress: Progress;
   onLogout: () => void;
+  onUserUpdate: (details: { name?: string; picture?: string }) => void;
 }) {
   const [subPage, setSubPage] = useState<SubPage>(null);
   const [showLogout, setShowLogout] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editedName, setEditedName] = useState(user?.name || "");
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const rank = progress.points >= 700 ? "Eco Champion" : progress.points >= 400 ? "Green Leader" : progress.points >= 200 ? "Earth Hero" : "Newbie";
+
+  const saveName = async () => {
+    const name = editedName.trim();
+    if (!name) {
+      setProfileError("Please enter your name.");
+      return;
+    }
+    const profileUserId = user?.id || "guest";
+    setSavingProfile(true);
+    setProfileError(null);
+    setProfileNotice(null);
+    try {
+      saveLocalProfileDetails(profileUserId, { name });
+      onUserUpdate({ name });
+      setShowEditProfile(false);
+      if (profileUserId !== "guest" && !profileUserId.startsWith("mobile-")) {
+        try {
+          await saveProfileDetails(profileUserId, { name });
+        } catch (error) {
+          console.error("Profile name saved locally but could not sync to Firebase", error);
+          setProfileNotice("Name saved on this device. Cloud sync failed; check your connection.");
+        }
+      }
+    } catch (error) {
+      console.error("Could not update profile name", error);
+      setProfileError(error instanceof Error ? error.message : "Could not update your name.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const uploadPhoto = async (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setProfileError("Choose an image file for your profile photo.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError("Choose an image smaller than 5 MB.");
+      return;
+    }
+    const profileUserId = user?.id || "guest";
+    setUploadingPhoto(true);
+    setProfileError(null);
+    setProfileNotice(null);
+    try {
+      const picture = await profileImageDataUrl(file);
+      saveLocalProfileDetails(profileUserId, { picture });
+      onUserUpdate({ picture });
+      if (profileUserId !== "guest" && !profileUserId.startsWith("mobile-")) {
+        try {
+          const remotePicture = await uploadProfilePhoto(profileUserId, file);
+          await saveProfileDetails(profileUserId, { picture: remotePicture });
+        } catch (error) {
+          console.error("Profile photo saved locally but could not sync to Firebase", error);
+          setProfileNotice("Photo saved on this device. Cloud sync failed; check your connection.");
+        }
+      }
+    } catch (error) {
+      console.error("Could not upload profile photo", error);
+      setProfileError(error instanceof Error ? error.message : "Could not upload your photo.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // Sub-page rendering
   if (subPage === "settings") return <SettingsPage onBack={() => setSubPage(null)} />;
@@ -505,7 +603,7 @@ export function ProfileScreen({
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto pb-28" style={{ scrollbarWidth: "none" }}>
+    <div className="relative flex-1 overflow-y-auto pb-28" style={{ scrollbarWidth: "none" }}>
 
       {/* Profile hero card */}
       <div className="mx-4 mt-5">
@@ -524,10 +622,35 @@ export function ProfileScreen({
           <div className="flex items-center gap-4 relative z-10">
             {/* Avatar */}
             <div className="relative">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-black text-2xl text-white"
-                style={{ background: "rgba(255,255,255,0.15)", border: "2px solid rgba(255,255,255,0.25)" }}>
-                {user?.name ? user.name[0].toUpperCase() : <User size={28} className="text-white" />}
-              </div>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  void uploadPhoto(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileError(null);
+                  setProfileNotice(null);
+                  photoInputRef.current?.click();
+                }}
+                disabled={uploadingPhoto}
+                aria-label="Upload profile photo"
+                className="relative w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden font-black text-2xl text-white"
+                style={{ background: "rgba(255,255,255,0.15)", border: "2px solid rgba(255,255,255,0.25)" }}
+              >
+                {user?.picture
+                  ? <img src={user.picture} alt="Profile" className="w-full h-full object-cover" />
+                  : user?.name ? user.name[0].toUpperCase() : <User size={28} className="text-white" />}
+                <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                  {uploadingPhoto ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                </span>
+              </button>
               <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
                 style={{ background: "#4ade80" }}>
                 <CheckCircle2 size={14} className="text-green-900" />
@@ -548,6 +671,13 @@ export function ProfileScreen({
             </div>
 
             <motion.button whileTap={{ scale: 0.9 }}
+              type="button"
+              onClick={() => {
+                setEditedName(user?.name || "");
+                setProfileError(null);
+                setShowEditProfile(true);
+              }}
+              aria-label="Edit profile name"
               className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)" }}>
               <Edit3 size={16} className="text-white" />
@@ -555,10 +685,9 @@ export function ProfileScreen({
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-2 mt-4 relative z-10">
+          <div className="grid grid-cols-3 gap-2 mt-4 relative z-10">
             {[
               { label: "Points",   value: progress.points,              icon: <Zap size={13} className="text-yellow-400" /> },
-              { label: "Trees",    value: progress.trees,               icon: <TreePine size={13} className="text-green-400" /> },
               { label: "Done",     value: progress.completedTasks.length, icon: <CheckCircle2 size={13} className="text-green-400" /> },
               { label: "Streak",   value: `${progress.streak}d`,        icon: <Flame size={13} className="text-orange-400" /> },
             ].map((s) => (
@@ -570,6 +699,11 @@ export function ProfileScreen({
               </div>
             ))}
           </div>
+          {(profileError || profileNotice) && !showEditProfile && (
+            <p role={profileError ? "alert" : "status"} className="text-green-100 text-xs mt-3 relative z-10">
+              {profileError || profileNotice}
+            </p>
+          )}
         </motion.div>
       </div>
 
@@ -679,6 +813,68 @@ export function ProfileScreen({
                   Log Out
                 </motion.button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showEditProfile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-5"
+            style={{ background: "rgba(2, 20, 10, 0.62)" }}
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setShowEditProfile(false);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 8 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 8 }}
+              className="w-full rounded-3xl p-5"
+              style={{ background: "#fff", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Profile</p>
+                  <h2 className="text-slate-800 text-lg font-black">Edit your name</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfile(false)}
+                  aria-label="Close edit profile"
+                  className="w-9 h-9 rounded-full flex items-center justify-center"
+                  style={{ background: "#f1f5f9" }}
+                >
+                  <X size={18} className="text-slate-500" />
+                </button>
+              </div>
+              <label className="block text-slate-600 text-xs font-bold mb-1.5" htmlFor="profile-name">Name</label>
+              <input
+                id="profile-name"
+                value={editedName}
+                onChange={(event) => setEditedName(event.target.value)}
+                maxLength={60}
+                autoFocus
+                className="w-full rounded-xl px-3.5 py-3 text-slate-800 outline-none"
+                style={{ border: "1px solid #cbd5e1" }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void saveName();
+                }}
+              />
+              {profileError && <p role="alert" className="text-red-600 text-xs mt-2">{profileError}</p>}
+              <button
+                type="button"
+                onClick={() => void saveName()}
+                disabled={savingProfile}
+                className="w-full mt-4 py-3 rounded-xl flex items-center justify-center gap-2 text-white font-bold disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg, #16a34a, #15803d)" }}
+              >
+                {savingProfile ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                {savingProfile ? "Saving..." : "Save name"}
+              </button>
             </motion.div>
           </motion.div>
         )}

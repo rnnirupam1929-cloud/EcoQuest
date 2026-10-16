@@ -45,7 +45,7 @@ function getRewards() {
       slug: "flower-pot",
       name: "Flower Pot",
       description: "Handcrafted terracotta ceramic pot with natural mineral glaze for your first green companion.",
-      points: 30,
+      points: 80,
       category: "Garden",
       image: "/assets/rewards/flower-pot.png",
       active: true
@@ -55,7 +55,7 @@ function getRewards() {
       slug: "watering-can",
       name: "Watering Can",
       description: "Ergonomic matte forest-green watering can with brass rose for delicate seedlings.",
-      points: 60,
+      points: 120,
       category: "Garden",
       image: "/assets/rewards/watering-can.png",
       active: true
@@ -65,7 +65,7 @@ function getRewards() {
       slug: "eco-bag",
       name: "Eco Bag",
       description: "Heavyweight organic cotton tote with reinforced handles, designed for zero-waste living.",
-      points: 90,
+      points: 190,
       category: "Lifestyle",
       image: "/assets/rewards/eco-bag.png",
       active: true
@@ -75,7 +75,7 @@ function getRewards() {
       slug: "seed-kit",
       name: "Seed Kit",
       description: "Curated box of 6 native heirloom wildflower and vegetable seed packets with planting markers.",
-      points: 120,
+      points: 210,
       category: "Nature",
       image: "/assets/rewards/seed-kit.png",
       active: true
@@ -85,7 +85,7 @@ function getRewards() {
       slug: "indoor-plant",
       name: "Indoor Plant",
       description: "Air-purifying live Peace Lily in a sustainable fluted ceramic tabletop planter.",
-      points: 150,
+      points: 250,
       category: "Nature",
       image: "/assets/rewards/indoor-plant.png",
       active: true
@@ -95,7 +95,7 @@ function getRewards() {
       slug: "compost-bin",
       name: "Compost Bin",
       description: "Odor-sealed kitchen countertop compost crock with replaceable activated charcoal filter.",
-      points: 180,
+      points: 320,
       category: "Waste",
       image: "/assets/rewards/compost-bin.png",
       active: true
@@ -105,7 +105,7 @@ function getRewards() {
       slug: "bird-house",
       name: "Bird House",
       description: "Artisan cedar nesting shelter crafted to support local pollinators and backyard birds.",
-      points: 210,
+      points: 870,
       category: "Wildlife",
       image: "/assets/rewards/bird-house.png",
       active: true
@@ -115,7 +115,7 @@ function getRewards() {
       slug: "eco-cookware",
       name: "Eco Cookware",
       description: "Mineral-based non-toxic ceramic fry pan crafted without PFAS, PTFE, lead or cadmium.",
-      points: 240,
+      points: 1350,
       category: "Kitchen",
       image: "/assets/rewards/eco-cookware.png",
       active: true
@@ -258,7 +258,7 @@ function claimReward(userId, rewardId, clientPoints) {
     redemptionCode,
     claimedAt: new Date().toISOString(),
     status: 'claimed',
-    retailerUrl: 'https://www.amazon.in/',
+    retailerUrl: `https://www.amazon.in/s?k=${encodeURIComponent(reward.name)}`,
     disclaimer: 'This EcoQuest reward code is an official environmental achievement milestone. It is not an Amazon-issued voucher or gift card unless an official retailer partner redemption integration has been activated.',
   };
 

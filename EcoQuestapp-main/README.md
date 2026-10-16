@@ -7,7 +7,7 @@
 
   Run `npm i` to install the dependencies.
 
-  Run `npm run server` in one terminal to start the Eco News RSS API. Eco News shows up to five latest articles; the RSS API keeps all unique feed results and refreshes hourly.
+  Run `npm run server` in one terminal to start the Eco News RSS API. Eco News shows four latest articles and refreshes hourly. If live feeds are unavailable, four Google News topic links remain available and open current search results.
 
   Run `npm run dev` in another terminal to start the app. The dashboard refreshes environmental news hourly and caches recent stories in each signed-in user's Firestore profile.
 
@@ -18,6 +18,8 @@
   The leaderboard uses the Firestore `leaderboard` collection and live listeners. Deploy the included Firestore rules to the Firebase project with `firebase deploy --only firestore:rules`; signed-in users can read leaderboard profiles, while each account can write only its own entry.
 
   Reward claims become one-time redemptions when the user selects “Redeem on Amazon.” The reward is then marked SOLD, and its point cost is deducted from the user's saved balance.
+
+  The rewards screen includes a bundled catalogue fallback for static deployments such as Vercel. Signed-in users' claims and redemptions are also saved transactionally in their existing Firestore user document, so reward actions continue to work if the optional Express API is unavailable. Guest/demo claims are saved in that browser's local storage.
 
   ## Waste detection
 

@@ -438,6 +438,176 @@ export async function getUserDoc(uid: string) {
   }
 }
 
+export interface FirebaseRewardClaim {
+  claimId: string;
+  userId: string;
+  rewardId: number;
+  rewardName: string;
+  rewardSlug: string;
+  pointsRequired: number;
+  redemptionCode: string;
+  claimedAt: string;
+  status: "claimed" | "redeemed";
+  redeemedAt?: string;
+  retailerUrl?: string;
+  disclaimer?: string;
+}
+
+type FirebaseReward = {
+  id: number;
+  slug: string;
+  name: string;
+  points: number;
+};
+
+function readFirebaseRewardClaims(data: Record<string, unknown> | undefined): FirebaseRewardClaim[] {
+  if (!Array.isArray(data?.rewardClaims)) return [];
+  return data.rewardClaims.filter((claim): claim is FirebaseRewardClaim =>
+    typeof claim === "object" &&
+    claim !== null &&
+    typeof claim.claimId === "string" &&
+    typeof claim.userId === "string" &&
+    Number.isInteger(claim.rewardId) &&
+    typeof claim.rewardName === "string" &&
+    typeof claim.rewardSlug === "string" &&
+    Number.isFinite(claim.pointsRequired) &&
+    typeof claim.redemptionCode === "string" &&
+    typeof claim.claimedAt === "string" &&
+    (claim.status === "claimed" || claim.status === "redeemed")
+  );
+}
+
+function requireFirebaseUser(uid: string) {
+  if (!uid || auth.currentUser?.uid !== uid) {
+    throw new Error("Sign in again to access your saved rewards.");
+  }
+}
+
+export async function getFirebaseRewardClaims(uid: string): Promise<FirebaseRewardClaim[]> {
+  requireFirebaseUser(uid);
+  const snapshot = await getDoc(doc(db, "users", uid));
+  return readFirebaseRewardClaims(snapshot.data());
+}
+
+export async function createFirebaseRewardClaim(
+  uid: string,
+  reward: FirebaseReward,
+  fallbackPoints: number,
+): Promise<{ claim: FirebaseRewardClaim; alreadyClaimed: boolean }> {
+  requireFirebaseUser(uid);
+  if (!Number.isInteger(reward.id) || !reward.slug || !reward.name ||
+      !Number.isFinite(reward.points) || reward.points <= 0) {
+    throw new Error("This reward has invalid details and cannot be claimed.");
+  }
+
+  const userRef = doc(db, "users", uid);
+  return runTransaction(db, async transaction => {
+    const snapshot = await transaction.get(userRef);
+    const userData = snapshot.data() || {};
+    const claims = readFirebaseRewardClaims(userData);
+    const existing = claims.find(claim => claim.rewardId === reward.id);
+    if (existing) return { claim: existing, alreadyClaimed: true };
+
+    const points = typeof userData.totalPoints === "number" && Number.isFinite(userData.totalPoints)
+      ? userData.totalPoints
+      : fallbackPoints;
+    if (!Number.isFinite(points) || points < reward.points) {
+      throw new Error(`You need ${Math.max(0, reward.points - points)} more points to unlock this reward.`);
+    }
+
+    const codePart = () => crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase().padStart(4, "0").slice(-4);
+    const claimedAt = new Date().toISOString();
+    const claim: FirebaseRewardClaim = {
+      claimId: crypto.randomUUID(),
+      userId: uid,
+      rewardId: reward.id,
+      rewardName: reward.name,
+      rewardSlug: reward.slug,
+      pointsRequired: reward.points,
+      redemptionCode: `ECO-${codePart()}-${codePart()}`,
+      claimedAt,
+      status: "claimed",
+      retailerUrl: `https://www.amazon.in/s?k=${encodeURIComponent(reward.name)}`,
+      disclaimer: "This EcoQuest code records your milestone. It is not a retailer-issued voucher or gift card.",
+    };
+    transaction.set(userRef, {
+      uid,
+      rewardClaims: [...claims, claim],
+    }, { merge: true });
+    return { claim, alreadyClaimed: false };
+  });
+}
+
+export async function redeemFirebaseRewardClaim(
+  uid: string,
+  claimId: string,
+  fallbackPoints: number,
+): Promise<{ claim: FirebaseRewardClaim; remainingPoints: number }> {
+  requireFirebaseUser(uid);
+  const userRef = doc(db, "users", uid);
+  return runTransaction(db, async transaction => {
+    const snapshot = await transaction.get(userRef);
+    const userData = snapshot.data() || {};
+    const claims = readFirebaseRewardClaims(userData);
+    const index = claims.findIndex(claim => claim.claimId === claimId);
+    if (index < 0) throw new Error("This reward claim could not be found.");
+
+    const redeemedIds = Array.isArray(userData.redeemedRewardClaims)
+      ? userData.redeemedRewardClaims.filter((id): id is string => typeof id === "string")
+      : [];
+    const claim = claims[index];
+    const currentPoints = typeof userData.totalPoints === "number" && Number.isFinite(userData.totalPoints)
+      ? userData.totalPoints
+      : fallbackPoints;
+    if (claim.status === "redeemed" || redeemedIds.includes(claimId)) {
+      return { claim: { ...claim, status: "redeemed" }, remainingPoints: currentPoints };
+    }
+    if (currentPoints < claim.pointsRequired) {
+      throw new Error(`You need ${claim.pointsRequired - currentPoints} more points to redeem this reward.`);
+    }
+
+    const redeemedAt = new Date().toISOString();
+    const redeemedClaim: FirebaseRewardClaim = { ...claim, status: "redeemed", redeemedAt };
+    const updatedClaims = claims.map((item, itemIndex) => itemIndex === index ? redeemedClaim : item);
+    const remainingPoints = currentPoints - claim.pointsRequired;
+    transaction.set(userRef, {
+      uid,
+      totalPoints: remainingPoints,
+      rewardClaims: updatedClaims,
+      redeemedRewardClaims: [...redeemedIds, claimId],
+    }, { merge: true });
+    return { claim: redeemedClaim, remainingPoints };
+  });
+}
+
+export async function syncFirebaseRewardRedemption(
+  uid: string,
+  claimId: string,
+  remainingPoints: number,
+): Promise<number> {
+  requireFirebaseUser(uid);
+  if (!claimId || !Number.isFinite(remainingPoints) || remainingPoints < 0) {
+    throw new Error("A valid reward claim and remaining point balance are required.");
+  }
+
+  const userRef = doc(db, "users", uid);
+  return runTransaction(db, async transaction => {
+    const snapshot = await transaction.get(userRef);
+    const userData = snapshot.data() || {};
+    const redeemedClaims = Array.isArray(userData.redeemedRewardClaims)
+      ? userData.redeemedRewardClaims.filter((id): id is string => typeof id === "string")
+      : [];
+    transaction.set(userRef, {
+      uid,
+      totalPoints: remainingPoints,
+      redeemedRewardClaims: redeemedClaims.includes(claimId)
+        ? redeemedClaims
+        : [...redeemedClaims, claimId],
+    }, { merge: true });
+    return remainingPoints;
+  });
+}
+
 export async function updateUserProgress(uid: string, data: Record<string, any>) {
   if (!uid) return;
   const userRef = doc(db, "users", uid);
@@ -495,8 +665,38 @@ export async function updateUserProfile(uid: string, data: Record<string, any>) 
   }
 }
 
+export async function saveProfileDetails(
+  uid: string,
+  details: { name?: string; picture?: string },
+): Promise<void> {
+  if (!uid || uid === "guest" || uid.startsWith("mobile-")) {
+    throw new Error("Sign in to save profile changes.");
+  }
+
+  const currentUser = auth.currentUser;
+  if (!currentUser || currentUser.uid !== uid) {
+    throw new Error("Your account session has expired. Please sign in again.");
+  }
+
+  if (details.name !== undefined) {
+    await updateProfile(currentUser, {
+      ...(details.name !== undefined ? { displayName: details.name } : {}),
+      ...(details.picture !== undefined ? { photoURL: details.picture } : {}),
+    });
+  } else if (details.picture !== undefined) {
+    await updateProfile(currentUser, { photoURL: details.picture });
+  }
+  await setDoc(doc(db, "users", uid), {
+    ...(details.name !== undefined ? { name: details.name } : {}),
+    ...(details.picture !== undefined ? { profilePhoto: details.picture } : {}),
+    uid,
+  }, { merge: true });
+}
+
 export async function uploadProfilePhoto(uid: string, file: File) {
-  if (!uid || !file) return null;
+  if (!uid || uid === "guest" || uid.startsWith("mobile-") || !file) {
+    throw new Error("Sign in to upload a profile photo.");
+  }
   const ref = storageRef(storage, `profilePhotos/${uid}/${file.name}`);
   await uploadBytes(ref, file);
   const url = await getDownloadURL(ref);

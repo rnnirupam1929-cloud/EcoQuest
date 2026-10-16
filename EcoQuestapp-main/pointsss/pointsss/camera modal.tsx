@@ -269,14 +269,6 @@ const CameraModal = ({
             Stop camera
           </button>
         )}
-        {(cameraActive || taskSubmitted) && (
-          <button type="button" className={embedded ? 'point-model-secondary' : 'secondary-button'} onClick={onClose}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-            Back to Dashboard
-          </button>
-        )}
       </div>
 
       {approved && (

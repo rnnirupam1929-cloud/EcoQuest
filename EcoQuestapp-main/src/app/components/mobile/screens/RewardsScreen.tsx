@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { redeemRewardPoints } from "../../../../firebase-config";
+import {
+  auth,
+  createFirebaseRewardClaim,
+  getFirebaseRewardClaims,
+  redeemFirebaseRewardClaim,
+  redeemRewardPoints,
+  syncFirebaseRewardRedemption,
+  type FirebaseRewardClaim,
+} from "../../../../firebase-config";
 import {
   Gift, Lock, Sparkles, CheckCircle2,
   Copy, ExternalLink, X, AlertCircle,
@@ -55,7 +63,7 @@ const AUTHORITATIVE_REWARDS: RewardItem[] = [
     slug: "flower-pot",
     name: "Flower Pot",
     description: "Handcrafted terracotta ceramic pot with natural mineral glaze for your first green companion.",
-    points: 30,
+    points: 80,
     category: "Garden",
     image: "/assets/rewards/flower-pot.jpg",
     active: true,
@@ -65,7 +73,7 @@ const AUTHORITATIVE_REWARDS: RewardItem[] = [
     slug: "watering-can",
     name: "Watering Can",
     description: "Ergonomic matte forest-green watering can with brass rose for delicate seedlings.",
-    points: 60,
+    points: 120,
     category: "Garden",
     image: "/assets/rewards/watering-can.jpg",
     active: true,
@@ -75,7 +83,7 @@ const AUTHORITATIVE_REWARDS: RewardItem[] = [
     slug: "eco-bag",
     name: "Eco Bag",
     description: "Heavyweight organic cotton tote with reinforced handles, designed for zero-waste living.",
-    points: 90,
+    points: 190,
     category: "Lifestyle",
     image: "/assets/rewards/eco-bag.jpg",
     active: true,
@@ -85,7 +93,7 @@ const AUTHORITATIVE_REWARDS: RewardItem[] = [
     slug: "seed-kit",
     name: "Seed Kit",
     description: "Curated box of 6 native heirloom wildflower and vegetable seed packets with planting markers.",
-    points: 120,
+    points: 210,
     category: "Nature",
     image: "/assets/rewards/seed-kit.jpg",
     active: true,
@@ -95,7 +103,7 @@ const AUTHORITATIVE_REWARDS: RewardItem[] = [
     slug: "indoor-plant",
     name: "Indoor Plant",
     description: "Air-purifying live Peace Lily in a sustainable fluted ceramic tabletop planter.",
-    points: 150,
+    points: 250,
     category: "Nature",
     image: "/assets/rewards/indoor-plant.jpg",
     active: true,
@@ -105,7 +113,7 @@ const AUTHORITATIVE_REWARDS: RewardItem[] = [
     slug: "compost-bin",
     name: "Compost Bin",
     description: "Odor-sealed kitchen countertop compost crock with replaceable activated charcoal filter.",
-    points: 180,
+    points: 320,
     category: "Waste",
     image: "/assets/rewards/compost-bin.jpg",
     active: true,
@@ -115,7 +123,7 @@ const AUTHORITATIVE_REWARDS: RewardItem[] = [
     slug: "bird-house",
     name: "Bird House",
     description: "Artisan cedar nesting shelter crafted to support local pollinators and backyard birds.",
-    points: 210,
+    points: 870,
     category: "Wildlife",
     image: "/assets/rewards/bird-house.jpg",
     active: true,
@@ -125,7 +133,7 @@ const AUTHORITATIVE_REWARDS: RewardItem[] = [
     slug: "eco-cookware",
     name: "Eco Cookware",
     description: "Mineral-based non-toxic ceramic fry pan crafted without PFAS, PTFE, lead or cadmium.",
-    points: 240,
+    points: 1350,
     category: "Kitchen",
     image: "/assets/rewards/eco-cookware.jpg",
     active: true,
@@ -139,6 +147,97 @@ const upcomingRewards = [
 ];
 
 const categories = ["All", "Garden", "Lifestyle", "Nature", "Waste", "Wildlife", "Kitchen"] as const;
+
+class RewardApiUnavailableError extends Error {}
+
+function isRewardItem(value: unknown): value is RewardItem {
+  if (!value || typeof value !== "object") return false;
+  const reward = value as Partial<RewardItem>;
+  return Number.isInteger(reward.id) &&
+    typeof reward.slug === "string" &&
+    typeof reward.name === "string" &&
+    typeof reward.description === "string" &&
+    Number.isFinite(reward.points) &&
+    categories.some(category => category === reward.category) &&
+    typeof reward.image === "string" &&
+    typeof reward.active === "boolean";
+}
+
+function isRewardClaim(value: unknown): value is RewardClaim {
+  if (!value || typeof value !== "object") return false;
+  const claim = value as Partial<RewardClaim>;
+  return typeof claim.claimId === "string" &&
+    typeof claim.userId === "string" &&
+    Number.isInteger(claim.rewardId) &&
+    typeof claim.rewardName === "string" &&
+    Number.isFinite(claim.pointsRequired) &&
+    typeof claim.redemptionCode === "string" &&
+    typeof claim.claimedAt === "string" &&
+    (claim.status === "claimed" || claim.status === "redeemed");
+}
+
+async function requestRewardApi<T>(url: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (error) {
+    throw new RewardApiUnavailableError(
+      error instanceof Error ? error.message : "The reward service could not be reached.",
+    );
+  }
+
+  const responseText = await response.text();
+  let data: unknown;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    throw new RewardApiUnavailableError(
+      `The reward service returned an invalid response (HTTP ${response.status}).`,
+    );
+  }
+
+  if (!response.ok) {
+    if (response.status === 404 || response.status >= 500) {
+      throw new RewardApiUnavailableError(`The reward service is unavailable (HTTP ${response.status}).`);
+    }
+    const message = data && typeof data === "object" && "error" in data && typeof data.error === "string"
+      ? data.error
+      : `Reward request failed (HTTP ${response.status}).`;
+    throw new Error(message);
+  }
+
+  return data as T;
+}
+
+function readLocalRewardClaims(userId: string): RewardClaim[] {
+  try {
+    const saved = localStorage.getItem(`ecoquest:reward-claims:${userId}`);
+    if (!saved) return [];
+    const parsed: unknown = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed.filter(isRewardClaim) : [];
+  } catch (error) {
+    console.warn("Could not read locally saved reward claims", error);
+    return [];
+  }
+}
+
+function saveLocalRewardClaims(userId: string, claims: RewardClaim[]) {
+  try {
+    localStorage.setItem(`ecoquest:reward-claims:${userId}`, JSON.stringify(claims));
+  } catch (error) {
+    console.error("Could not save reward claims on this device", error);
+    throw new Error("Could not save this reward on this device. Check available browser storage and try again.");
+  }
+}
+
+function localRewardCode() {
+  const part = () => crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase().padStart(4, "0").slice(-4);
+  return `ECO-${part()}-${part()}`;
+}
+
+function imageForReward(reward: RewardItem) {
+  return AUTHORITATIVE_REWARDS.find(item => item.slug === reward.slug)?.image || reward.image;
+}
 
 interface Props {
   progress: Progress;
@@ -168,47 +267,60 @@ export function RewardsScreen({ progress, user, setProgress }: Props) {
 
     async function loadData() {
       try {
-        // Load configured rewards
-        const res = await fetch("/api/rewards");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.ok && Array.isArray(data.rewards) && data.rewards.length > 0 && isMounted) {
-            setRewards(data.rewards);
-          }
+        const data = await requestRewardApi<{ ok: boolean; rewards: unknown }>("/api/rewards");
+        if (data.ok && Array.isArray(data.rewards)) {
+          const validRewards = data.rewards.filter(isRewardItem);
+          if (validRewards.length > 0 && isMounted) setRewards(validRewards);
         }
       } catch (err) {
-        console.warn("Using authoritative local rewards fallback", err);
+        console.info("Using the bundled rewards catalogue because the reward API is unavailable.", err);
       }
 
-      // Load existing claims for this user
+      let loadedFromApi = false;
       try {
-        const claimsRes = await fetch(`/api/rewards/user/${encodeURIComponent(effectiveUserId)}`);
-        if (claimsRes.ok) {
-          const claimsData = await claimsRes.json();
-          if (claimsData.ok && Array.isArray(claimsData.claims) && isMounted) {
-            const userClaims = claimsData.claims as RewardClaim[];
-            setClaims(userClaims);
-            if (user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
-              for (const redeemedClaim of userClaims.filter(item => item.status === "redeemed")) {
-                try {
-                  const remainingPoints = await redeemRewardPoints(
-                    user.id,
-                    redeemedClaim.claimId,
-                    redeemedClaim.pointsRequired,
-                    pts,
-                  );
-                  if (isMounted) {
-                    setProgress?.((previous) => ({ ...previous, points: remainingPoints }));
-                  }
-                } catch (error) {
-                  console.error("Unable to restore redeemed reward points from Firebase", error);
-                }
+        const claimsData = await requestRewardApi<{ ok: boolean; claims: unknown }>(
+          `/api/rewards/user/${encodeURIComponent(effectiveUserId)}`,
+        );
+        if (!claimsData.ok || !Array.isArray(claimsData.claims) ||
+            !claimsData.claims.every(isRewardClaim)) {
+          throw new RewardApiUnavailableError("The reward service returned an invalid claims list.");
+        }
+        const userClaims = claimsData.claims;
+        loadedFromApi = true;
+        if (isMounted) setClaims(userClaims);
+        if (user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
+          for (const redeemedClaim of userClaims.filter(item => item.status === "redeemed")) {
+            try {
+              const remainingPoints = await redeemRewardPoints(
+                user.id,
+                redeemedClaim.claimId,
+                redeemedClaim.pointsRequired,
+                pts,
+              );
+              if (isMounted) {
+                setProgress?.((previous) => ({ ...previous, points: remainingPoints }));
               }
+            } catch (error) {
+              console.error("Unable to restore redeemed reward points from Firebase", error);
             }
           }
         }
       } catch (err) {
-        console.warn("Unable to fetch claims from server", err);
+        console.info("Loading saved reward claims from persistent browser or Firebase storage.", err);
+      }
+
+      if (!loadedFromApi) {
+        if (user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
+          try {
+            const firebaseClaims = await getFirebaseRewardClaims(user.id);
+            if (isMounted) setClaims(firebaseClaims);
+          } catch (error) {
+            console.error("Unable to load reward claims from Firebase", error);
+            if (isMounted) setClaimError("Your saved rewards could not be loaded. Check your connection and try again.");
+          }
+        } else if (isMounted) {
+          setClaims(readLocalRewardClaims(effectiveUserId));
+        }
       }
     }
 
@@ -260,31 +372,143 @@ export function RewardsScreen({ progress, user, setProgress }: Props) {
       setClaimingId(null);
       return;
     }
+    const amazonWindow = window.open("about:blank", "_blank");
+    if (amazonWindow) amazonWindow.opener = null;
 
     try {
-      const res = await fetch("/api/rewards/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: effectiveUserId,
-          rewardId: reward.id,
-          points: pts,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Claim verification failed.");
+      let claim: RewardClaim;
+      let alreadyClaimed = false;
+      try {
+        const data = await requestRewardApi<{
+          ok: boolean;
+          claim: unknown;
+          alreadyClaimed?: boolean;
+          error?: string;
+        }>("/api/rewards/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: effectiveUserId,
+            rewardId: reward.id,
+            points: pts,
+          }),
+        });
+        if (!data.ok || !isRewardClaim(data.claim)) {
+          throw new Error(data.error || "The reward service returned an invalid claim.");
+        }
+        claim = data.claim;
+        alreadyClaimed = Boolean(data.alreadyClaimed);
+      } catch (error) {
+        if (!(error instanceof RewardApiUnavailableError)) throw error;
+        if (user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
+          const result = await createFirebaseRewardClaim(user.id, reward, pts);
+          claim = result.claim;
+          alreadyClaimed = result.alreadyClaimed;
+        } else {
+          const savedClaims = readLocalRewardClaims(effectiveUserId);
+          const existing = savedClaims.find(item => item.rewardId === reward.id);
+          if (existing) {
+            claim = existing;
+            alreadyClaimed = true;
+          } else {
+            if (pts < reward.points) {
+              throw new Error(`You need ${reward.points - pts} more points to unlock this reward.`);
+            }
+            claim = {
+              claimId: crypto.randomUUID(),
+              userId: effectiveUserId,
+              rewardId: reward.id,
+              rewardName: reward.name,
+              rewardSlug: reward.slug,
+              pointsRequired: reward.points,
+              redemptionCode: localRewardCode(),
+              claimedAt: new Date().toISOString(),
+              status: "claimed",
+              retailerUrl: `https://www.amazon.in/s?k=${encodeURIComponent(reward.name)}`,
+              disclaimer: "This EcoQuest code records your milestone. It is not a retailer-issued voucher or gift card.",
+            };
+            saveLocalRewardClaims(effectiveUserId, [...savedClaims, claim]);
+          }
+        }
       }
-
-      const claim: RewardClaim = data.claim;
 
       // Update state
       setClaims((prev) => {
         const filtered = prev.filter((c) => c.rewardId !== reward.id);
         return [...filtered, claim];
       });
+
+      if (!alreadyClaimed) {
+        let redeemedClaim: RewardClaim;
+        let remainingPoints: number;
+        let redeemedInFirebase = false;
+        try {
+          try {
+            const data = await requestRewardApi<{
+              ok: boolean;
+              claim: unknown;
+              remainingPoints: number;
+              error?: string;
+            }>("/api/rewards/redeem", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId: effectiveUserId, claimId: claim.claimId }),
+            });
+            if (!data.ok || !isRewardClaim(data.claim) ||
+                !Number.isFinite(data.remainingPoints) || data.remainingPoints < 0) {
+              throw new Error(data.error || "The reward service returned an invalid redemption.");
+            }
+            redeemedClaim = data.claim;
+            remainingPoints = data.remainingPoints;
+          } catch (error) {
+            if (!(error instanceof RewardApiUnavailableError)) throw error;
+            if (user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
+              const result = await redeemFirebaseRewardClaim(user.id, claim.claimId, pts);
+              redeemedClaim = result.claim;
+              remainingPoints = result.remainingPoints;
+              redeemedInFirebase = true;
+            } else {
+              redeemedClaim = { ...claim, status: "redeemed", redeemedAt: new Date().toISOString() };
+              saveLocalRewardClaims(effectiveUserId, [
+                ...readLocalRewardClaims(effectiveUserId).filter(item => item.claimId !== claim.claimId),
+                redeemedClaim,
+              ]);
+              remainingPoints = pts - claim.pointsRequired;
+            }
+          }
+
+          if (!redeemedInFirebase && user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
+            try {
+              remainingPoints = await syncFirebaseRewardRedemption(
+                user.id,
+                claim.claimId,
+                remainingPoints,
+              );
+            } catch (error) {
+              console.error("Reward redeemed but Firebase balance could not be synced", error);
+              setClaimError("Reward redeemed, but your account balance could not be synced. Please refresh the app.");
+            }
+          }
+          setProgress?.((previous) => ({ ...previous, points: remainingPoints }));
+          setClaims((previous) => previous.map((item) =>
+            item.claimId === redeemedClaim.claimId ? redeemedClaim : item
+          ));
+          claim = redeemedClaim;
+          const destination = claim.retailerUrl && claim.retailerUrl !== "https://www.amazon.in/"
+            ? claim.retailerUrl
+            : `https://www.amazon.in/s?k=${encodeURIComponent(reward.name)}`;
+          if (amazonWindow) amazonWindow.location.href = destination;
+          else window.open(destination, "_blank", "noopener,noreferrer");
+        } catch (error) {
+          amazonWindow?.close();
+          console.error("Reward was claimed but could not be redeemed:", error);
+          setClaimError(error instanceof Error
+            ? `Reward claimed, but redemption failed: ${error.message}`
+            : "Reward claimed, but redemption failed. Open View Code to try again.");
+        }
+      } else {
+        amazonWindow?.close();
+      }
 
       // Launch Celebratory Confetti
       try {
@@ -302,11 +526,12 @@ export function RewardsScreen({ progress, user, setProgress }: Props) {
       setActiveModalClaim({
         claim,
         reward,
-        isNewClaim: !data.alreadyClaimed,
+        isNewClaim: !alreadyClaimed,
       });
-    } catch (err: any) {
+    } catch (err) {
+      amazonWindow?.close();
       console.error("Reward claim error:", err);
-      setClaimError(err.message || "Unable to claim reward. Please verify network and try again.");
+      setClaimError(err instanceof Error ? err.message : "Unable to claim reward. Please verify network and try again.");
     } finally {
       setClaimingId(null);
     }
@@ -355,47 +580,74 @@ export function RewardsScreen({ progress, user, setProgress }: Props) {
     if (!activeModalClaim || activeModalClaim.claim.status === "redeemed" || claimingId !== null) return;
 
     const { claim, reward } = activeModalClaim;
-    const destination = claim.retailerUrl || "https://www.amazon.in/";
+    const destination = claim.retailerUrl && claim.retailerUrl !== "https://www.amazon.in/"
+      ? claim.retailerUrl
+      : `https://www.amazon.in/s?k=${encodeURIComponent(reward.name)}`;
     const amazonWindow = window.open("about:blank", "_blank");
     if (amazonWindow) amazonWindow.opener = null;
 
     setClaimingId(reward.id);
     setClaimError(null);
     try {
-      const response = await fetch("/api/rewards/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: effectiveUserId, claimId: claim.claimId }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Unable to redeem this reward.");
+      let redeemedClaim: RewardClaim;
+      let remainingPoints: number;
+      let redeemedInFirebase = false;
+      try {
+        const data = await requestRewardApi<{
+          ok: boolean;
+          claim: unknown;
+          remainingPoints: number;
+          error?: string;
+        }>("/api/rewards/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: effectiveUserId, claimId: claim.claimId }),
+        });
+        if (!data.ok || !isRewardClaim(data.claim)) {
+          throw new Error(data.error || "The reward service returned an invalid redemption.");
+        }
+        if (!Number.isFinite(data.remainingPoints) || data.remainingPoints < 0) {
+          throw new Error("The reward service returned an invalid point balance.");
+        }
+        redeemedClaim = data.claim;
+        remainingPoints = data.remainingPoints;
+      } catch (error) {
+        if (!(error instanceof RewardApiUnavailableError)) throw error;
+        if (user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
+          const result = await redeemFirebaseRewardClaim(user.id, claim.claimId, pts);
+          redeemedClaim = result.claim;
+          remainingPoints = result.remainingPoints;
+          redeemedInFirebase = true;
+        } else {
+          if (pts < claim.pointsRequired) {
+            throw new Error(`You need ${claim.pointsRequired - pts} more points to redeem this reward.`);
+          }
+          const savedClaims = readLocalRewardClaims(effectiveUserId);
+          const existingIndex = savedClaims.findIndex(item => item.claimId === claim.claimId);
+          if (existingIndex < 0) throw new Error("This reward claim could not be found on this device.");
+          redeemedClaim = { ...savedClaims[existingIndex], status: "redeemed", redeemedAt: new Date().toISOString() };
+          savedClaims[existingIndex] = redeemedClaim;
+          saveLocalRewardClaims(effectiveUserId, savedClaims);
+          remainingPoints = Math.max(0, pts - claim.pointsRequired);
+        }
       }
 
-      if (typeof data.remainingPoints !== "number" || !Number.isFinite(data.remainingPoints) || data.remainingPoints < 0) {
-        throw new Error("The reward service returned an invalid point balance.");
+      if (!redeemedInFirebase && user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
+        try {
+          remainingPoints = await syncFirebaseRewardRedemption(
+            user.id,
+            claim.claimId,
+            remainingPoints,
+          );
+        } catch (error) {
+          console.error("Reward redeemed but Firebase balance could not be synced", error);
+          setClaimError("Reward redeemed, but your account balance could not be synced. Please refresh the app.");
+        }
       }
-      const redeemedClaim: RewardClaim = data.claim;
-      let remainingPoints = data.remainingPoints;
       setProgress?.((previous) => ({ ...previous, points: remainingPoints }));
       setClaims((previous) => previous.map((item) =>
         item.claimId === redeemedClaim.claimId ? redeemedClaim : item
       ));
-
-      if (user && user.id !== "guest" && !user.id.startsWith("mobile-")) {
-        try {
-          remainingPoints = await redeemRewardPoints(
-            user.id,
-            claim.claimId,
-            claim.pointsRequired,
-            remainingPoints,
-          );
-          setProgress?.((previous) => ({ ...previous, points: remainingPoints }));
-        } catch (error) {
-          console.error("Reward points were redeemed but the Firebase balance could not be synced", error);
-          setClaimError("Reward redeemed, but your account balance could not be synced. Please refresh the app.");
-        }
-      }
       setActiveModalClaim(null);
       if (amazonWindow) {
         amazonWindow.location.href = destination;
@@ -646,7 +898,7 @@ export function RewardsScreen({ progress, user, setProgress }: Props) {
                 {/* Product Illustration */}
                 <div className="relative w-full aspect-[4/3] bg-emerald-50/40 overflow-hidden flex items-center justify-center p-2">
                   <img
-                    src={reward.image}
+                    src={imageForReward(reward)}
                     alt={reward.name}
                     className="w-full h-full object-cover rounded-2xl"
                     onError={(e) => {
@@ -734,10 +986,7 @@ export function RewardsScreen({ progress, user, setProgress }: Props) {
                         {isProcessing ? (
                           <span>Verifying…</span>
                         ) : (
-                          <>
-                            <Sparkles size={13} />
-                            <span>Claim Reward</span>
-                          </>
+                          <span>Claim Reward</span>
                         )}
                       </button>
                     )}
@@ -876,7 +1125,7 @@ export function RewardsScreen({ progress, user, setProgress }: Props) {
                   }}
                 >
                   <img
-                    src={activeModalClaim.reward.image}
+                    src={imageForReward(activeModalClaim.reward)}
                     alt={activeModalClaim.reward.name}
                     className="w-full h-full object-cover rounded-xl"
                   />

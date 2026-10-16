@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Search, TreePine, MapPin, Navigation, Star, Bike,
+  Search, TreePine, MapPin, Navigation, Star,
   ShoppingBag, ArrowRight, ExternalLink, Leaf, Compass,
-  Clock, Users, ChevronRight, Globe,
+  Users, ChevronRight, Globe,
 } from "lucide-react";
 
-type Section = "parks" | "activities" | "shopping";
+type Section = "parks" | "shopping";
 
 const parks = [
   { name: "Cubbon Park",         dist: "1.2 km", rating: 4.8, tag: "Urban Forest",  trees: "6,000+", visitors: "10k/day", color: "#dcfce7", icon: "🌳" },
@@ -16,15 +16,6 @@ const parks = [
   { name: "Hebbal Lake",         dist: "5.1 km", rating: 4.5, tag: "Wetlands",      trees: "200+",   visitors: "2k/day",  color: "#e0f2fe", icon: "🦢" },
 ];
 
-const activities = [
-  { icon: "🚲", name: "Cycle to Work",    desc: "Save 2.3 kg CO₂ daily",        time: "Anytime",       tag: "Transport",  pts: 100, color: "#dcfce7" },
-  { icon: "🌱", name: "Community Garden", desc: "Grow food with neighbours",     time: "Sun, 7–10am",   tag: "Nature",     pts: 150, color: "#fef9c3" },
-  { icon: "♻️", name: "E-Waste Drive",    desc: "Drop off old electronics",      time: "Sat & Sun",     tag: "Recycle",    pts: 120, color: "#e0f2fe" },
-  { icon: "🌊", name: "Lake Cleanup",     desc: "Restore local water bodies",    time: "This Saturday", tag: "Water",      pts: 200, color: "#f3e8ff" },
-  { icon: "🌳", name: "Tree Plantation",  desc: "Plant trees in your ward",      time: "Next Sunday",   tag: "Nature",     pts: 180, color: "#dcfce7" },
-  { icon: "🍃", name: "Vermi Composting", desc: "Turn waste into rich compost",  time: "Workshop",      tag: "Waste",      pts: 160, color: "#fce7f3" },
-];
-
 const shops = [
   { name: "Green Earth Store",  tag: "Organic",     emoji: "🌿", rating: 4.8, dist: "0.8 km", desc: "Organic groceries & natural products" },
   { name: "Zero Waste Hub",     tag: "Reusable",    emoji: "♻️", rating: 4.6, dist: "1.5 km", desc: "All things reusable and sustainable" },
@@ -32,6 +23,13 @@ const shops = [
   { name: "PlantBase Kitchen",  tag: "Vegan",       emoji: "🥗", rating: 4.7, dist: "1.1 km", desc: "Plant-based food and ingredients" },
   { name: "SolarBazaar",        tag: "Energy",      emoji: "☀️", rating: 4.5, dist: "3.4 km", desc: "Solar gadgets and green energy products" },
 ];
+
+function openParkInGoogleMaps(parkName: string) {
+  const url = new URL("https://www.google.com/maps/search/");
+  url.searchParams.set("api", "1");
+  url.searchParams.set("query", `${parkName}, Bengaluru, India`);
+  window.open(url.toString(), "_blank", "noopener,noreferrer");
+}
 
 export function ExploreScreen() {
   const [section, setSection] = useState<Section>("parks");
@@ -49,7 +47,7 @@ export function ExploreScreen() {
         <div className="relative">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            placeholder="Search parks, activities, shops…"
+            placeholder="Search parks or shops…"
             value={query}
             onChange={e => setQuery(e.target.value)}
             className="w-full pl-11 pr-4 py-3 rounded-2xl outline-none text-slate-700 text-sm"
@@ -67,7 +65,6 @@ export function ExploreScreen() {
         <div className="flex gap-1 p-1 rounded-2xl" style={{ background: "rgba(22,163,74,0.08)" }}>
           {[
             { id: "parks",      label: "Parks",     icon: <TreePine size={13} /> },
-            { id: "activities", label: "Activities", icon: <Bike size={13} /> },
             { id: "shopping",   label: "Eco Shops",  icon: <ShoppingBag size={13} /> },
           ].map(s => (
             <motion.button
@@ -156,6 +153,9 @@ export function ExploreScreen() {
                     </div>
                     <motion.button
                       whileTap={{ scale: 0.92 }}
+                      type="button"
+                      onClick={() => openParkInGoogleMaps(park.name)}
+                      aria-label={`Open ${park.name} in Google Maps`}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-white text-xs"
                       style={{ background: "linear-gradient(135deg, #16a34a, #15803d)", boxShadow: "0 3px 10px rgba(22,163,74,0.3)" }}
                     >
@@ -174,46 +174,6 @@ export function ExploreScreen() {
                 </p>
                 <ChevronRight size={14} className="text-green-400 flex-shrink-0" />
               </div>
-            </div>
-          )}
-
-          {/* ACTIVITIES */}
-          {section === "activities" && (
-            <div className="px-4 grid grid-cols-2 gap-3">
-              {activities.map((a, i) => (
-                <motion.div
-                  key={a.name}
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: i * 0.07 }}
-                  className="p-4 rounded-2xl flex flex-col"
-                  style={{
-                    background: a.color,
-                    border: "1.5px solid rgba(22,163,74,0.12)",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                  }}
-                >
-                  <span style={{ fontSize: "1.8rem" }}>{a.icon}</span>
-                  <p className="text-green-900 font-black text-sm mt-2 leading-tight">{a.name}</p>
-                  <p className="text-green-700 text-xs mt-0.5 leading-tight opacity-80">{a.desc}</p>
-
-                  <div className="mt-2 flex items-center gap-1">
-                    <Clock size={10} className="text-green-600" />
-                    <span className="text-green-700 text-xs font-semibold">{a.time}</span>
-                  </div>
-
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs px-2 py-0.5 rounded-full font-bold text-green-800"
-                      style={{ background: "rgba(255,255,255,0.7)" }}>
-                      +{a.pts} pts
-                    </span>
-                    <motion.button whileTap={{ scale: 0.9 }}
-                      className="flex items-center gap-1 text-green-800 font-black text-xs">
-                      Join <ArrowRight size={11} />
-                    </motion.button>
-                  </div>
-                </motion.div>
-              ))}
             </div>
           )}
 
