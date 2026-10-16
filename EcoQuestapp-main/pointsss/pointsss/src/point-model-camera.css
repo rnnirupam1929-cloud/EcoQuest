@@ -1,0 +1,324 @@
+.point-model-modal {
+  position: absolute;
+  z-index: 1400;
+  inset: 0;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding: 16px;
+  background: #0a1628;
+  color: #f8fafc;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.point-model-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.point-model-header .title-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.point-model-header .icon-box {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  border: 1px solid rgba(34, 197, 94, 0.32);
+  border-radius: 14px;
+  background: rgba(22, 163, 74, 0.18);
+  color: #4ade80;
+}
+
+.point-model-header .icon-box svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.point-model-header .title-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.point-model-header .task-title {
+  color: #f8fafc;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.point-model-header .task-subtitle {
+  color: #94a3b8;
+  font-size: 0.68rem;
+}
+
+.point-model-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+
+.point-model-close svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.point-model-camera-stage {
+  position: relative;
+  display: grid;
+  min-height: 180px;
+  flex: 1 1 0;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid rgba(34, 197, 94, 0.28);
+  border-radius: 24px;
+  background: #000;
+}
+
+.point-model-camera-stage .camera-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+}
+
+.point-model-camera-stage.camera-stage-live .camera-video {
+  opacity: 1;
+}
+
+.point-model-camera-stage .live-badge {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #f8fafc;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  transform: translateX(-50%);
+}
+
+.point-model-camera-stage .live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.point-model-camera-visual {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.point-model-camera-visual .camera-icon-wrap {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 2px dashed rgba(34, 197, 94, 0.35);
+  border-radius: 50%;
+  color: #4ade80;
+}
+
+.point-model-camera-visual svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.point-model-camera-message {
+  max-width: 220px;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.point-model-camera-error,
+.point-model-error {
+  color: #fecaca;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.point-model-camera-error {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  padding: 9px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: 12px;
+  background: rgba(69, 10, 10, 0.88);
+}
+
+.point-model-hint {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  border-radius: 16px;
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.point-model-hint.hint-banner-approved {
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(22, 163, 74, 0.2);
+}
+
+.point-model-hint .hint-emoji {
+  font-size: 1.1rem;
+}
+
+.point-model-hint p {
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.point-model-actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.point-model-primary,
+.point-model-secondary {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 15px;
+  font-weight: 800;
+}
+
+.point-model-primary {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 8px 24px rgba(22, 163, 74, 0.25);
+  color: white;
+}
+
+.point-model-primary:disabled {
+  opacity: 0.7;
+}
+
+.point-model-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.07);
+  color: #cbd5e1;
+}
+
+.point-model-success-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.point-model-success-card {
+  width: 100%;
+  padding: 25px 18px 20px;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 25px;
+  background: #0a1628;
+  color: #f8fafc;
+  text-align: center;
+}
+
+.point-model-success-card .success-confetti {
+  color: #facc15;
+  font-size: 1.7rem;
+}
+
+.point-model-success-card .success-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin: 8px auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #16a34a;
+  color: white;
+  font-size: 1.6rem;
+}
+
+.point-model-success-card .success-eyebrow {
+  color: #86efac;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.point-model-success-card h2 {
+  margin: 7px 0;
+  font-size: 1.35rem;
+}
+
+.point-model-success-card .success-copy,
+.point-model-success-card .success-disclaimer {
+  margin: 8px 0;
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.point-model-earned {
+  margin: 13px 0;
+  color: #fde047;
+  font-size: 1.65rem;
+  font-weight: 900;
+}
+
+.point-model-earned span {
+  display: block;
+  color: #fef08a;
+  font-size: 0.75rem;
+}

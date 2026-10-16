@@ -1,0 +1,432 @@
+:root {
+    --eco-green: #2e7d32;
+    --light-green: #e8f5e9;
+    --accent: #38ef7d;
+    --bg-color: linear-gradient(135deg, #11998e, #38ef7d);
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --text-color: #333;
+}
+
+body.dark-mode {
+    --eco-green: #81c784;
+    --light-green: #1b5e20;
+    --accent: #00e676;
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-color: #e0e0e0;
+}
+
+body.light-mode {
+    --bg-color: #f0f2f5;
+    --card-bg: #ffffff;
+    --text-color: #333;
+}
+
+body {
+    margin: 0; 
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--bg-color); 
+    background-attachment: fixed;
+    min-height: 100vh; 
+    color: var(--text-color); 
+    transition: 0.3s;
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+}
+
+.main-wrapper {
+    width: 100%; 
+    max-width: 450px; 
+    height: 100vh;
+    position: relative; 
+    background: var(--bg-color);
+    overflow-x: hidden; 
+    box-shadow: 0 0 50px rgba(0,0,0,0.3);
+}
+
+.container { 
+    width: 100%; 
+    padding: 15px; 
+    box-sizing: border-box; 
+}
+
+.card { 
+    background: var(--card-bg); 
+    padding: 20px; 
+    border-radius: 25px; 
+    margin-top: 15px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+}
+
+.hidden { 
+    display: none !important; 
+}
+
+.sidebar a { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    padding: 14px 20px; 
+    text-decoration: none; 
+    font-size: 0.95rem; 
+    color: white; 
+    border-radius: 12px; 
+    transition: 0.2s; 
+}
+
+.material-symbols-outlined { 
+    vertical-align: middle; 
+}
+
+.news-marquee-box { 
+    background: #0a3d0d; 
+    color: #fff; 
+    padding: 15px; 
+    border-radius: 15px; 
+    margin: 15px 0; 
+    font-size: 0.9rem; 
+    border: 1px solid var(--accent); 
+    min-height: 130px; 
+}
+
+#chatBox { 
+    height: 120px; 
+    overflow-y: auto; 
+    background: white; 
+    border: 1px solid #ddd; 
+    padding: 10px; 
+    border-radius: 10px; 
+    margin-bottom: 5px; 
+    color: #333; 
+    font-size: 0.85rem; 
+}
+
+.reward-grid, .gallery-grid { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 10px; 
+    margin-top: 15px; 
+}
+
+.reward-item, .gallery-item { 
+    background: var(--light-green); 
+    padding: 15px; 
+    border-radius: 20px; 
+    text-align: center; 
+    color: #333; 
+    transition: 0.3s; 
+    position: relative; 
+    overflow: hidden; 
+}
+
+.gallery-item img { 
+    width: 100%; 
+    border-radius: 12px; 
+    height: 100px; 
+    object-fit: cover; 
+    margin-bottom: 5px; 
+}
+
+.coin-box { 
+    background: #fff; 
+    border: 1px solid #ddd; 
+    border-radius: 12px; 
+    padding: 4px 8px; 
+    font-size: 0.75rem; 
+    font-weight: bold; 
+    margin: 8px auto; 
+    display: inline-block; 
+}
+
+.reward-item.unlocked { 
+    border: 2px solid var(--accent); 
+    background: white; 
+    transform: scale(1.02); 
+}
+
+.locked-icon { 
+    filter: grayscale(1); 
+    opacity: 0.2; 
+}
+
+.claim-btn { 
+    background: var(--accent); 
+    border: none; 
+    padding: 8px; 
+    border-radius: 10px; 
+    font-size: 0.75rem; 
+    cursor: pointer; 
+    font-weight: bold; 
+    width: 100%; 
+    margin-top: 5px; 
+}
+
+.sold-stamp {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-20deg);
+    border: 3px solid #d32f2f;
+    color: #d32f2f;
+    font-weight: 900;
+    padding: 5px 10px;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    border-radius: 5px;
+    opacity: 0.8;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.app-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    color: white; 
+    padding: 10px; 
+    font-weight: bold; 
+}
+
+.task-card { 
+    background: var(--card-bg); 
+    padding: 12px; 
+    border-radius: 15px; 
+    margin-bottom: 8px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    border-left: 5px solid var(--eco-green); 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+}
+
+.task-info { 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+}
+
+.premium-task-icon { 
+    color: var(--eco-green); 
+    font-size: 22px; 
+}
+
+input, select { 
+    width: 100%; 
+    padding: 12px; 
+    margin: 8px 0; 
+    border-radius: 12px; 
+    border: 1px solid #ccc; 
+    box-sizing: border-box; 
+}
+
+button { 
+    width: 100%; 
+    padding: 12px; 
+    border-radius: 15px; 
+    border: none; 
+    background: var(--eco-green); 
+    color: white; 
+    font-weight: bold; 
+    cursor: pointer; 
+    margin: 5px 0; 
+}
+
+.google-btn { 
+    background: white !important; 
+    color: #444 !important; 
+    border: 1px solid #ddd !important; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 10px; 
+}
+
+.google-btn img { 
+    width: 20px; 
+}
+
+.overlay { 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)); 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    z-index: 5000; 
+    color: white; 
+    text-align: center; 
+}
+
+.sidebar { 
+    height: 100%; 
+    width: 0; 
+    position: absolute; 
+    z-index: 6000; 
+    top: 0; 
+    left: 0; 
+    background-color: #0d3b0e; 
+    overflow-x: hidden; 
+    transition: 0.3s; 
+    padding-top: 20px; 
+}
+
+.side-block { 
+    background: rgba(255,255,255,0.1); 
+    border-radius: 20px; 
+    margin: 12px; 
+    padding: 8px; 
+    overflow: hidden; 
+}
+
+.info-modal { 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background: var(--card-bg); 
+    z-index: 7000; 
+    overflow-y: auto; 
+    padding: 20px; 
+    box-sizing: border-box; 
+}
+
+.refer-modal-content { 
+    text-align: center; 
+    color: var(--text-color); 
+}
+
+.refer-logo { 
+    width: 100px; 
+    height: 100px; 
+    margin-bottom: 10px; 
+    object-fit: contain; 
+}
+
+.refer-rewards-preview { 
+    display: flex; 
+    justify-content: center; 
+    gap: 20px; 
+    margin: 15px 0; 
+    color: var(--accent); 
+}
+
+.refer-rewards-preview .material-symbols-outlined { 
+    font-size: 32px; 
+}
+
+.wa-btn { 
+    background: #25D366 !important; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 10px; 
+}
+
+.invite-link-box { 
+    font-size: 0.75rem; 
+    background: #f0f0f0; 
+    padding: 8px; 
+    border-radius: 8px; 
+    margin-top: 10px; 
+    word-break: break-all; 
+    color: #666; 
+}
+
+.social-footer { 
+    text-align: center; 
+    padding: 20px 0; 
+    color: white; 
+    border-top: 1px solid rgba(255,255,255,0.1); 
+    margin-top: 10px; 
+}
+
+.social-icons { 
+    display: flex; 
+    justify-content: center; 
+    gap: 15px; 
+    margin-bottom: 10px; 
+}
+
+.social-icons img { 
+    width: 22px; 
+    height: 22px; 
+    cursor: pointer; 
+    transition: 0.3s; 
+    filter: brightness(0) invert(1); 
+}
+
+.app-version { 
+    font-size: 0.7rem; 
+    opacity: 0.7; 
+}
+
+#resendBtn {
+    text-align: center; 
+    color: var(--eco-green); 
+    font-size: 14px; 
+    cursor: pointer; 
+    font-weight: bold; 
+    text-decoration: underline; 
+    margin-top: 10px;
+}
+
+#captureNotify {
+    position: absolute; 
+    top: 20%; 
+    left: 50%; 
+    transform: translateX(-50%);
+    background: var(--accent); 
+    color: black; 
+    padding: 10px 20px;
+    border-radius: 30px; 
+    font-weight: bold; 
+    z-index: 8000;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    display: none; 
+    animation: fadeInOut 2s forwards;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, -20px); }
+    20% { opacity: 1; transform: translate(-50%, 0); }
+    80% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+
+.otp-alert-overlay { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background: rgba(0,0,0,0.85); 
+    z-index: 9999; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+}
+
+.otp-alert-card { 
+    background: white; 
+    padding: 30px; 
+    border-radius: 25px; 
+    text-align: center; 
+    width: 80%; 
+    max-width: 320px; 
+    box-shadow: 0 0 30px var(--accent); 
+    border: 3px solid var(--accent); 
+}
+
+.otp-big-code { 
+    font-size: 48px; 
+    font-weight: 900; 
+    color: #2e7d32; 
+    letter-spacing: 8px; 
+    margin: 20px 0; 
+    display: block; 
+}

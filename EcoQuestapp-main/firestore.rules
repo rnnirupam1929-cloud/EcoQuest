@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId;
+      allow delete: if false;
+    }
+
+    match /leaderboard/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.keys().hasOnly([
+          "uid",
+          "name",
+          "photoURL",
+          "totalPoints",
+          "weeklyPoints",
+          "monthlyPoints",
+          "weekKey",
+          "monthKey",
+          "streak",
+          "lastActiveDay",
+          "updatedAt"
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.photoURL is string
+        && request.resource.data.totalPoints is number
+        && request.resource.data.totalPoints >= 0
+        && request.resource.data.weeklyPoints is number
+        && request.resource.data.weeklyPoints >= 0
+        && request.resource.data.monthlyPoints is number
+        && request.resource.data.monthlyPoints >= 0
+        && request.resource.data.streak is int
+        && request.resource.data.streak >= 0;
+      allow delete: if false;
+    }
+  }
+}

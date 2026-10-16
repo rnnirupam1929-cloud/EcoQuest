@@ -1,0 +1,9 @@
+[
+  { "name": "The Guardian - Environment", "url": "https://www.theguardian.com/environment/rss" },
+  { "name": "BBC News - Environment", "url": "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml" },
+  { "name": "Mongabay", "url": "https://news.mongabay.com/feed/" },
+  { "name": "Nature - Climate Change", "url": "https://www.nature.com/subjects/climate-change.rss" },
+  { "name": "Google News", "url": "https://news.google.com/rss/search?q=climate+OR+environment+OR+sustainability&hl=en-IN&gl=IN&ceid=IN:en" },
+  { "name": "Google News", "url": "https://news.google.com/rss/search?q=India+environment+OR+pollution+OR+conservation&hl=en-IN&gl=IN&ceid=IN:en" },
+  { "name": "Google News", "url": "https://news.google.com/rss/search?q=renewable+energy+OR+wildlife+OR+biodiversity&hl=en&gl=US&ceid=US:en" }
+]

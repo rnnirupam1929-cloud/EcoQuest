@@ -1,0 +1,10 @@
+{
+  "description": "This eco-friendly app uses AI to classify waste, guide users to the correct bin, and gamify recycling, promoting responsible disposal and sustainability.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
