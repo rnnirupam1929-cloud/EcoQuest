@@ -141,9 +141,12 @@ function HomeTab({
   chatMessages: ChatMsg[]; chatInput: string;
   setChatInput: (v: string) => void; sendChat: () => void; chatLoading: boolean;
 }) {
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatMessagesRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const chatMessagesElement = chatMessagesRef.current;
+    if (chatMessagesElement) {
+      chatMessagesElement.scrollTo({ top: chatMessagesElement.scrollHeight, behavior: "smooth" });
+    }
   }, [chatMessages, chatLoading]);
 
   const [newsItems, setNewsItems] = useState<NewsItem[]>(GOOGLE_NEWS_FALLBACK);
@@ -343,7 +346,7 @@ function HomeTab({
         </div>
 
         {/* Messages */}
-        <div className="px-4 pt-3 pb-2 flex flex-col gap-2.5"
+        <div ref={chatMessagesRef} className="px-4 pt-3 pb-2 flex flex-col gap-2.5"
           style={{ minHeight: 100, maxHeight: 220, overflowY: "auto", scrollbarWidth: "none" }}>
 
           {/* Welcome bubble */}
@@ -406,7 +409,6 @@ function HomeTab({
               </div>
             </motion.div>
           )}
-          <div ref={chatEndRef} />
         </div>
 
         {/* Quick prompts (only when empty) */}
